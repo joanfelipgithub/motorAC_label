@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MotorScan — 3Φ Calculator</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;600;800&display=swap');
 
@@ -275,17 +275,29 @@ function handleFileUpload(e) {
 
 // --- OCR Logic ---
 async function runOCR() {
-  setStatus('Processing OCR...', true);
-  const worker = await Tesseract.createWorker('eng');
-  await worker.setParameters({ 
-    tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,/ +-:ΔYkKWVAHz()%φηΦ',
-    tessedit_pageseg_mode: '6'
-  });
-  
-  const { data: { text } } = await worker.recognize(capturedDataUrl);
-  await worker.terminate();
-  parseAndFill(text);
-  setStatus('Extraction Complete.', false, true);
+  if (!capturedDataUrl) return;
+  setStatus('Initializing OCR engine...', true);
+  try {
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          setStatus('Recognizing... ' + Math.round(m.progress * 100) + '%', true);
+        }
+      }
+    });
+    await worker.setParameters({
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,/ +-:kKWVAHz()%'
+    });
+    const { data: { text } } = await worker.recognize(capturedDataUrl);
+    await worker.terminate();
+    const rawEl = document.getElementById('ocr-raw');
+    if (rawEl) rawEl.textContent = text;
+    parseAndFill(text);
+    setStatus('Extraction complete — review values below.', false, true);
+  } catch(err) {
+    console.error('OCR Error:', err);
+    setStatus('OCR failed: ' + err.message, false, true, true);
+  }
 }
 
 // --- Fuzzy Parser ---
