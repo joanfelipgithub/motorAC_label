@@ -276,22 +276,20 @@ function handleFileUpload(e) {
 // --- OCR Logic ---
 async function runOCR() {
   if (!capturedDataUrl) return;
-  setStatus('Initializing OCR engine...', true);
+  setStatus('Initializing OCR...', true);
   try {
     const worker = await Tesseract.createWorker('eng', 1, {
       logger: m => {
-        if (m.status === 'recognizing text') {
+        if (m.status === 'recognizing text')
           setStatus('Recognizing... ' + Math.round(m.progress * 100) + '%', true);
-        }
       }
     });
+    // DO NOT pass tessedit_pageseg_mode here — it causes the SetVariable crash
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,/ +-:kKWVAHz()%'
     });
     const { data: { text } } = await worker.recognize(capturedDataUrl);
     await worker.terminate();
-    const rawEl = document.getElementById('ocr-raw');
-    if (rawEl) rawEl.textContent = text;
     parseAndFill(text);
     setStatus('Extraction complete — review values below.', false, true);
   } catch(err) {
